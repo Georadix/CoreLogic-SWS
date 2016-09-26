@@ -63,6 +63,33 @@
         }
 
         /// <summary>
+        /// Gets the authorized features and operations accessible to the current SWS account.
+        /// </summary>
+        /// <returns>An <see cref="AuthorizedFeaturesResponse"/> instance.</returns>
+        public AuthorizedFeaturesResponse GetAuthorizedFeatures()
+        {
+            this.EnsureValidAuthKey();
+
+            return this.GetAuthorizedFeatures(this.authKey);
+        }
+
+        /// <summary>
+        /// Gets the authorized features and operations accessible to the current SWS account.
+        /// </summary>
+        /// <param name="authKey">The authentication key to access SWS.</param>
+        /// <returns>An <see cref="AuthorizedFeaturesResponse"/> instance.</returns>
+        public AuthorizedFeaturesResponse GetAuthorizedFeatures(string authKey)
+        {
+            var request = this.httpClient.GetAsync("features?authKey=" + authKey);
+            request.Wait();
+
+            var response = request.Result.Content.ReadAsAsync<AuthorizedFeaturesResponse>();
+            response.Wait();
+
+            return response.Result;
+        }
+
+        /// <summary>
         /// Gets the spatial record parcel count within a specified polygon.
         /// </summary>
         /// <param name="polygonWkt">The polygon, in well-known text (WKT) format.</param>
@@ -73,7 +100,22 @@
         {
             this.EnsureValidAuthKey();
 
-            var content = new SpatialRecordPolygonRequest(this.authKey, polygonWkt, 1, 1, bundle);
+            return this.GetSpatialRecordParcelCount(this.authKey, polygonWkt, bundle);
+        }
+
+        /// <summary>
+        /// Gets the spatial record parcel count within a specified polygon.
+        /// </summary>
+        /// <param name="authKey">The authentication key to access SWS.</param>
+        /// <param name="polygonWkt">The polygon, in well-known text (WKT) format.</param>
+        /// <param name="bundle">The bundle.</param>
+        /// <returns>The number of parcels within the specified polygon.</returns>
+        public int GetSpatialRecordParcelCount(
+            string authKey,
+            string polygonWkt,
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+        {
+            var content = new SpatialRecordPolygonRequest(authKey, polygonWkt, 1, 1, bundle);
 
             var request = this.CreateSpatialRecordTask(HttpMethod.Post, content);
             request.Wait();
@@ -87,15 +129,54 @@
         /// <summary>
         /// Gets the parcels within a specified polygon.
         /// </summary>
+        /// <param name="authKey">The authentication key to access SWS.</param>
+        /// <param name="polygonWkt">The polygon, in well-known text (WKT) format.</param>
+        /// <param name="bundle">The bundle.</param>
+        /// <returns>An array of <see cref="SpatialRecordParcel"/> instances.</returns>
+        public SpatialRecordParcel[] GetSpatialRecordParcels(
+            string authKey,
+            string polygonWkt,
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+        {
+            return this.GetSpatialRecordParcels(
+                this.authKey,
+                HttpMethod.Post,
+                (key, pageNumber) => new SpatialRecordPolygonRequest(key, polygonWkt, pageNumber, 50, bundle));
+        }
+
+        /// <summary>
+        /// Gets the parcels within a specified polygon.
+        /// </summary>
         /// <param name="polygonWkt">The polygon, in well-known text (WKT) format.</param>
         /// <param name="bundle">The bundle.</param>
         /// <returns>An array of <see cref="SpatialRecordParcel"/> instances.</returns>
         public SpatialRecordParcel[] GetSpatialRecordParcels(
             string polygonWkt, SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
         {
+            this.EnsureValidAuthKey();
+
+            return this.GetSpatialRecordParcels(this.authKey, polygonWkt, bundle);
+        }
+
+        /// <summary>
+        /// Gets the parcels at a specified latitude/longitude.
+        /// </summary>
+        /// <param name="authKey">The authentication key to access SWS.</param>
+        /// <param name="latitude">The latitude.</param>
+        /// <param name="longitude">The longitude.</param>
+        /// <param name="bundle">The bundle.</param>
+        /// <returns>An array of <see cref="SpatialRecordParcel"/> instances.</returns>
+        public SpatialRecordParcel[] GetSpatialRecordParcels(
+            string authKey,
+            double latitude,
+            double longitude,
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+        {
             return this.GetSpatialRecordParcels(
-                HttpMethod.Post,
-                (authKey, pageNumber) => new SpatialRecordPolygonRequest(authKey, polygonWkt, pageNumber, 50, bundle));
+                authKey,
+                HttpMethod.Get,
+                (key, pageNumber) =>
+                    new SpatialRecordLatLongRequest(key, latitude, longitude, pageNumber, 50, bundle));
         }
 
         /// <summary>
@@ -108,10 +189,9 @@
         public SpatialRecordParcel[] GetSpatialRecordParcels(
             double latitude, double longitude, SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
         {
-            return this.GetSpatialRecordParcels(
-                HttpMethod.Get,
-                (authKey, pageNumber) =>
-                    new SpatialRecordLatLongRequest(authKey, latitude, longitude, pageNumber, 50, bundle));
+            this.EnsureValidAuthKey();
+
+            return this.GetSpatialRecordParcels(this.authKey, latitude, longitude, bundle);
         }
 
         /// <summary>
@@ -171,11 +251,9 @@
         }
 
         private SpatialRecordParcel[] GetSpatialRecordParcels(
-            HttpMethod method, Func<string, int, SpatialRecordRequest> factory)
+            string authKey, HttpMethod method, Func<string, int, SpatialRecordRequest> factory)
         {
-            this.EnsureValidAuthKey();
-
-            var content = factory(this.authKey, 1);
+            var content = factory(authKey, 1);
 
             var request = this.CreateSpatialRecordTask(method, content);
             request.Wait();
@@ -197,7 +275,7 @@
 
                     for (var j = 2 + (i * 10); j <= Math.Min(11 + (i * 10), numberOfExtraPages + 1); j++)
                     {
-                        var followUpContent = factory(this.authKey, j);
+                        var followUpContent = factory(authKey, j);
                         tasks.Add(this.CreateSpatialRecordTask(method, followUpContent));
                     }
 

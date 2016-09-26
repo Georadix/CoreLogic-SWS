@@ -16,11 +16,22 @@
         }
 
         [Fact(Skip = "External web service call, run manually.")]
+        public void GetAuthorizedFeaturesReturnsIt()
+        {
+            var sut = new SwsClient(this.config.Object);
+
+            var response = sut.GetAuthorizedFeatures("authKey");
+
+            Assert.NotNull(response);
+        }
+
+        [Fact(Skip = "External web service call, run manually.")]
         public void GetSpatialRecordParcelCountWithPolygonReturnsCount()
         {
             var sut = new SwsClient(this.config.Object);
 
             var count = sut.GetSpatialRecordParcelCount(
+                "authKey",
                 "Polygon((-77.042999 38.89601,-77.039459 38.894239,-77.033536 38.896911,-77.041197 38.899467,-77.042999 38.89601))");
 
             Assert.Equal(30, count);
