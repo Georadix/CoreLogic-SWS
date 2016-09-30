@@ -8,6 +8,21 @@
     public interface ISwsClient
     {
         /// <summary>
+        /// Geocodes the specified address.
+        /// </summary>
+        /// <param name="address">The address.</param>
+        /// <returns>A <see cref="PxPointGeocodeResult"/> instance.</returns>
+        PxPointGeocodeResult Geocode(string address);
+
+        /// <summary>
+        /// Geocodes the specified address.
+        /// </summary>
+        /// <param name="authKey">The authentication key to access SWS.</param>
+        /// <param name="address">The address.</param>
+        /// <returns>A <see cref="PxPointGeocodeResult"/> instance.</returns>
+        PxPointGeocodeResult Geocode(string authKey, string address);
+
+        /// <summary>
         /// Gets the authorized features and operations accessible to the current SWS account.
         /// </summary>
         /// <returns>An <see cref="AuthorizedFeaturesResponse"/> instance.</returns>
