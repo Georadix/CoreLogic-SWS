@@ -16,6 +16,16 @@
         }
 
         [Fact(Skip = "External web service call, run manually.")]
+        public void GeocodeReturnsExpectedResult()
+        {
+            var sut = new SwsClient(this.config.Object);
+
+            var response = sut.Geocode("1414 FERNWOOD PL, SEFFNER, FL 33584");
+
+            Assert.NotNull(response);
+        }
+
+        [Fact(Skip = "External web service call, run manually.")]
         public void GetAuthorizedFeaturesReturnsIt()
         {
             var sut = new SwsClient(this.config.Object);
