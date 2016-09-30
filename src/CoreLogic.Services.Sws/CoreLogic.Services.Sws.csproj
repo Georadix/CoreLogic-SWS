@@ -71,10 +71,16 @@
     <Compile Include="AuthorizedOperation.cs" />
     <Compile Include="AuthRequest.cs" />
     <Compile Include="AuthResponse.cs" />
+    <Compile Include="PxPointGeocodeResponse.cs" />
+    <Compile Include="PxPointGeocodingDataset.cs" />
     <Compile Include="ISwsClient.cs" />
     <Compile Include="ISwsConfig.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PageInfo.cs" />
+    <Compile Include="PxPointGeocodeDetails.cs" />
+    <Compile Include="PxPointMatchConfidence.cs" />
+    <Compile Include="PxPointGeocodeResult.cs" />
+    <Compile Include="PxPointStringArray.cs" />
     <Compile Include="SpatialRecordBundle.cs" />
     <Compile Include="SpatialRecordLatLongRequest.cs" />
     <Compile Include="SpatialRecordParcel.cs" />

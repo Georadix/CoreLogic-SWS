@@ -8,6 +8,7 @@
     using System.Net.Http;
     using System.Net.Http.Formatting;
     using System.Threading.Tasks;
+    using System.Web;
 
     /// <summary>
     /// Represents a client used to communicate with CoreLogic's Spatial Web Services (SWS).
@@ -60,6 +61,41 @@
         {
             this.Dispose(true);
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Geocodes the specified address.
+        /// </summary>
+        /// <param name="address">The address.</param>
+        /// <returns>A <see cref="PxPointGeocodeResult"/> instance.</returns>
+        public PxPointGeocodeResult Geocode(string address)
+        {
+            this.EnsureValidAuthKey();
+
+            return this.Geocode(this.authKey, address);
+        }
+
+        /// <summary>
+        /// Geocodes the specified address.
+        /// </summary>
+        /// <param name="authKey">The authentication key to access SWS.</param>
+        /// <param name="address">The address.</param>
+        /// <returns>A <see cref="PxPointGeocodeResult"/> instance.</returns>
+        public PxPointGeocodeResult Geocode(string authKey, string address)
+        {
+            var query = HttpUtility.ParseQueryString(string.Empty);
+
+            query.Add("address", address);
+            query.Add("full", "false");
+            query.Add("authKey", authKey);
+
+            var request = this.httpClient.GetAsync("geocode?" + query.ToString());
+            request.Wait();
+
+            var response = request.Result.Content.ReadAsAsync<PxPointGeocodeResponse>();
+            response.Wait();
+
+            return response.Result.Location;
         }
 
         /// <summary>
