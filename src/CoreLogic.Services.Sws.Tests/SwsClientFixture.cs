@@ -11,7 +11,7 @@
         {
             this.config.Setup(c => c.Username).Returns("username");
             this.config.Setup(c => c.Password).Returns("password");
-            this.config.Setup(c => c.EndpointUrl).Returns("endpoint");
+            this.config.Setup(c => c.EndpointUrl).Returns("http://sws.corelogic.com/api/v3.0.0/");
             this.config.Setup(c => c.Timeout).Returns(10);
         }
 
@@ -20,7 +20,7 @@
         {
             var sut = new SwsClient(this.config.Object);
 
-            var response = sut.Geocode("1414 FERNWOOD PL, SEFFNER, FL 33584");
+            var response = sut.Geocode("115 OLD FIELD LN, ST AUGUSTINE, FL 32092");
 
             Assert.NotNull(response);
         }
