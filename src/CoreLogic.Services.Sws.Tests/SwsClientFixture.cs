@@ -11,6 +11,7 @@
         {
             this.config.Setup(c => c.Username).Returns("username");
             this.config.Setup(c => c.Password).Returns("password");
+            this.config.Setup(c => c.NonSolicitationAreaWkt).Returns<string>(null);
             this.config.Setup(c => c.EndpointUrl).Returns("http://sws.corelogic.com/api/v3.0.0/");
             this.config.Setup(c => c.Timeout).Returns(10);
         }
@@ -48,7 +49,8 @@
 
             Assert.Equal(unfilteredCount, count);
 
-            var limitedCount = sut.GetSpatialRecordParcelCount(polygonWkt: polygonWkt, limitBySolicitation: true);
+            var limitedCount = sut.GetSpatialRecordParcelCount(
+                polygonWkt: polygonWkt, excludeNonSolicitationStates: true);
 
             Assert.Equal(filteredCount, limitedCount);
         }
@@ -78,7 +80,8 @@
 
             Assert.Equal(unfilteredCount, parcels.Length);
 
-            var limitedParcels = sut.GetSpatialRecordParcels(polygonWkt: polygonWkt, limitBySolicitation: true);
+            var limitedParcels = sut.GetSpatialRecordParcels(
+                polygonWkt: polygonWkt, excludeNonSolicitationStates: true);
 
             Assert.Equal(filteredCount, limitedParcels.Length);
         }

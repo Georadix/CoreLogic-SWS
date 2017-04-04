@@ -30,6 +30,11 @@
             get { return this.EndpointUrl; }
         }
 
+        string ISwsConfig.NonSolicitationAreaWkt
+        {
+            get { return this.NonSolicitationAreaWkt; }
+        }
+
         string ISwsConfig.Password
         {
             get { return this.Password; }
@@ -43,6 +48,15 @@
         string ISwsConfig.Username
         {
             get { return this.Username; }
+        }
+
+        /// <summary>
+        /// Gets the non solicitation area in well-known text (WKT).
+        /// </summary>
+        [ConfigurationProperty("nonSolicitationAreaWkt", IsRequired = false, DefaultValue = null)]
+        public string NonSolicitationAreaWkt
+        {
+            get { return (string)this["nonSolicitationAreaWkt"]; }
         }
 
         /// <summary>

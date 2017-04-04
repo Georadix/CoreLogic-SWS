@@ -11,6 +11,11 @@
         string EndpointUrl { get; }
 
         /// <summary>
+        /// Gets the non solicitation area in well-known text (WKT).
+        /// </summary>
+        string NonSolicitationAreaWkt { get; }
+
+        /// <summary>
         /// Gets the password.
         /// </summary>
         string Password { get; }
