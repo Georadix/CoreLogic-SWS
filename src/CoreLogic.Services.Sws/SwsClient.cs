@@ -1,10 +1,13 @@
 ﻿namespace CoreLogic.Services.Sws
 {
+    using GeoAPI.Geometries;
+    using NetTopologySuite.IO;
     using Newtonsoft.Json;
     using Newtonsoft.Json.Serialization;
     using System;
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
+    using System.Linq;
     using System.Net.Http;
     using System.Net.Http.Formatting;
     using System.Threading.Tasks;
@@ -16,10 +19,21 @@
     [ExcludeFromCodeCoverage]
     public class SwsClient : ISwsClient, IDisposable
     {
+        // Padded bounding boxes of Idaho + Montana and Kansas.
+        private static string nonSolicitationAreaWkt = "MULTIPOLYGON(((" +
+            "-117.390593 49.16172, -103.71802 49.16172, -103.71802 41.767646, -117.390593 41.767646, -117.390593 49.161720"
+            + ")), ((" +
+            "-102.249155 40.103545, -94.462404 40.103545, -94.462404 36.883405, -102.249155 36.883405, -102.249155 40.103545"
+            + ")))";
+
+        private static string[] nonSolicitationStateCodes = new string[] { "KS", "ID", "MT" };
+
         private readonly ISwsConfig config;
         private readonly JsonMediaTypeFormatter formatter;
         private readonly HttpClient httpClient;
+        private readonly IGeometry nonSolicitationArea;
         private readonly object syncRoot = new object();
+        private readonly WKTReader wktReader;
         private string authKey;
         private DateTime authKeyTimestamp;
         private bool disposed = false;
@@ -44,6 +58,18 @@
             this.httpClient = HttpClientFactory.Create(new SwsErrorHandler());
             this.httpClient.BaseAddress = new Uri(this.config.EndpointUrl);
             this.httpClient.Timeout = TimeSpan.FromSeconds(this.config.Timeout);
+
+            this.wktReader = new WKTReader();
+            this.wktReader.DefaultSRID = 4326;
+
+            if (string.IsNullOrWhiteSpace(this.config.NonSolicitationAreaWkt))
+            {
+                this.nonSolicitationArea = this.wktReader.Read(nonSolicitationAreaWkt);
+            }
+            else
+            {
+                this.nonSolicitationArea = this.wktReader.Read(this.config.NonSolicitationAreaWkt);
+            }
         }
 
         /// <summary>
@@ -130,13 +156,18 @@
         /// </summary>
         /// <param name="polygonWkt">The polygon, in well-known text (WKT) format.</param>
         /// <param name="bundle">The bundle.</param>
+        /// <param name="excludeNonSolicitationStates">
+        /// Exclude parcels in states in which owner cannot be solicited.
+        /// </param>
         /// <returns>The number of parcels within the specified polygon.</returns>
         public int GetSpatialRecordParcelCount(
-            string polygonWkt, SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+            string polygonWkt,
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium,
+            bool excludeNonSolicitationStates = false)
         {
             this.EnsureValidAuthKey();
 
-            return this.GetSpatialRecordParcelCount(this.authKey, polygonWkt, bundle);
+            return this.GetSpatialRecordParcelCount(this.authKey, polygonWkt, bundle, excludeNonSolicitationStates);
         }
 
         /// <summary>
@@ -145,21 +176,34 @@
         /// <param name="authKey">The authentication key to access SWS.</param>
         /// <param name="polygonWkt">The polygon, in well-known text (WKT) format.</param>
         /// <param name="bundle">The bundle.</param>
+        /// <param name="excludeNonSolicitationStates">
+        /// Exclude parcels in states in which owner cannot be solicited.
+        /// </param>
         /// <returns>The number of parcels within the specified polygon.</returns>
         public int GetSpatialRecordParcelCount(
             string authKey,
             string polygonWkt,
-            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium,
+            bool excludeNonSolicitationStates = false)
         {
-            var content = new SpatialRecordPolygonRequest(authKey, polygonWkt, 1, 1, bundle);
+            var polygon = this.wktReader.Read(polygonWkt);
 
-            var request = this.CreateSpatialRecordTask(HttpMethod.Post, content);
-            request.Wait();
+            if (excludeNonSolicitationStates && this.nonSolicitationArea.Intersects(polygon))
+            {
+                return this.GetSpatialRecordParcels(polygonWkt, bundle, true).Length;
+            }
+            else
+            {
+                var content = new SpatialRecordPolygonRequest(authKey, polygonWkt, 1, 1, bundle);
 
-            var response = request.Result.Content.ReadAsAsync<SpatialRecordResponse>();
-            response.Wait();
+                var request = this.CreateSpatialRecordTask(HttpMethod.Post, content);
+                request.Wait();
 
-            return response.Result.PageInfo.Length;
+                var response = request.Result.Content.ReadAsAsync<SpatialRecordResponse>();
+                response.Wait();
+
+                return response.Result.PageInfo.Length;
+            }
         }
 
         /// <summary>
@@ -168,16 +212,21 @@
         /// <param name="authKey">The authentication key to access SWS.</param>
         /// <param name="polygonWkt">The polygon, in well-known text (WKT) format.</param>
         /// <param name="bundle">The bundle.</param>
+        /// <param name="excludeNonSolicitationStates">
+        /// Exclude parcels in states in which owner cannot be solicited.
+        /// </param>
         /// <returns>An array of <see cref="SpatialRecordParcel"/> instances.</returns>
         public SpatialRecordParcel[] GetSpatialRecordParcels(
             string authKey,
             string polygonWkt,
-            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium,
+            bool excludeNonSolicitationStates = false)
         {
             return this.GetSpatialRecordParcels(
                 this.authKey,
                 HttpMethod.Post,
-                (key, pageNumber) => new SpatialRecordPolygonRequest(key, polygonWkt, pageNumber, 50, bundle));
+                (key, pageNumber) => new SpatialRecordPolygonRequest(key, polygonWkt, pageNumber, 50, bundle),
+                excludeNonSolicitationStates);
         }
 
         /// <summary>
@@ -185,13 +234,18 @@
         /// </summary>
         /// <param name="polygonWkt">The polygon, in well-known text (WKT) format.</param>
         /// <param name="bundle">The bundle.</param>
+        /// <param name="excludeNonSolicitationStates">
+        /// Exclude parcels in states in which owner cannot be solicited.
+        /// </param>
         /// <returns>An array of <see cref="SpatialRecordParcel"/> instances.</returns>
         public SpatialRecordParcel[] GetSpatialRecordParcels(
-            string polygonWkt, SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+            string polygonWkt,
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium,
+            bool excludeNonSolicitationStates = false)
         {
             this.EnsureValidAuthKey();
 
-            return this.GetSpatialRecordParcels(this.authKey, polygonWkt, bundle);
+            return this.GetSpatialRecordParcels(this.authKey, polygonWkt, bundle, excludeNonSolicitationStates);
         }
 
         /// <summary>
@@ -201,18 +255,22 @@
         /// <param name="latitude">The latitude.</param>
         /// <param name="longitude">The longitude.</param>
         /// <param name="bundle">The bundle.</param>
+        /// <param name="excludeNonSolicitationStates">
+        /// Exclude parcels in states in which owner cannot be solicited.
+        /// </param>
         /// <returns>An array of <see cref="SpatialRecordParcel"/> instances.</returns>
         public SpatialRecordParcel[] GetSpatialRecordParcels(
             string authKey,
             double latitude,
             double longitude,
-            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium,
+            bool excludeNonSolicitationStates = false)
         {
             return this.GetSpatialRecordParcels(
                 authKey,
                 HttpMethod.Get,
-                (key, pageNumber) =>
-                    new SpatialRecordLatLongRequest(key, latitude, longitude, pageNumber, 50, bundle));
+                (key, pageNumber) => new SpatialRecordLatLongRequest(key, latitude, longitude, pageNumber, 50, bundle),
+                excludeNonSolicitationStates);
         }
 
         /// <summary>
@@ -221,13 +279,20 @@
         /// <param name="latitude">The latitude.</param>
         /// <param name="longitude">The longitude.</param>
         /// <param name="bundle">The bundle.</param>
+        /// <param name="excludeNonSolicitationStates">
+        /// Exclude parcels in states in which owner cannot be solicited.
+        /// </param>
         /// <returns>An array of <see cref="SpatialRecordParcel"/> instances.</returns>
         public SpatialRecordParcel[] GetSpatialRecordParcels(
-            double latitude, double longitude, SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium)
+            double latitude,
+            double longitude,
+            SpatialRecordBundle bundle = SpatialRecordBundle.SpatialRecordOGPremium,
+            bool excludeNonSolicitationStates = false)
         {
             this.EnsureValidAuthKey();
 
-            return this.GetSpatialRecordParcels(this.authKey, latitude, longitude, bundle);
+            return this.GetSpatialRecordParcels(
+                this.authKey, latitude, longitude, bundle, excludeNonSolicitationStates);
         }
 
         /// <summary>
@@ -287,7 +352,10 @@
         }
 
         private SpatialRecordParcel[] GetSpatialRecordParcels(
-            string authKey, HttpMethod method, Func<string, int, SpatialRecordRequest> factory)
+            string authKey,
+            HttpMethod method,
+            Func<string, int, SpatialRecordRequest> factory,
+            bool excludeNonSolicitationStates)
         {
             var content = factory(authKey, 1);
 
@@ -327,6 +395,11 @@
 
                     parcels.AddRange(taskResponse.Result.Parcels);
                 }
+            }
+
+            if (excludeNonSolicitationStates)
+            {
+                return parcels.Where(p => !nonSolicitationStateCodes.Contains(p.State.ToUpper())).ToArray();
             }
 
             return parcels.ToArray();
