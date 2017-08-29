@@ -4,7 +4,7 @@
     using System.Diagnostics.CodeAnalysis;
 
     /// <summary>
-    /// Represents the configuration for CoreLogic's Spatial Web Services (SWS).
+    /// Represents the configuration for CoreLogic Spatial Web Services (SWS).
     /// </summary>
     [ExcludeFromCodeCoverage]
     public class SwsConfigurationSection : ConfigurationSection, ISwsConfig

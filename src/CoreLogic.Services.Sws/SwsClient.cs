@@ -14,7 +14,7 @@
     using System.Web;
 
     /// <summary>
-    /// Represents a client used to communicate with CoreLogic's Spatial Web Services (SWS).
+    /// Represents a client used to communicate with CoreLogic Spatial Web Services (SWS).
     /// </summary>
     [ExcludeFromCodeCoverage]
     public class SwsClient : ISwsClient, IDisposable

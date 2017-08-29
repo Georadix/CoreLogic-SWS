@@ -3,7 +3,7 @@
     using System;
 
     /// <summary>
-    /// Defines a client used to communicate with CoreLogic's Spatial Web Services (SWS).
+    /// Defines a client used to communicate with CoreLogic Spatial Web Services (SWS).
     /// </summary>
     public interface ISwsClient
     {

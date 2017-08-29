@@ -5,10 +5,29 @@
     using System.Threading.Tasks;
 
     /// <summary>
-    /// A handler that throws exceptions for unsuccessful requests to CoreLogic's Spatial Web Services (SWS).
+    /// A handler that throws exceptions for unsuccessful requests to CoreLogic Spatial Web Services (SWS).
     /// </summary>
     public class SwsErrorHandler : DelegatingHandler
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SwsErrorHandler"/> class.
+        /// </summary>
+        public SwsErrorHandler()
+            : base()
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SwsErrorHandler"/> class with a specific inner handler.
+        /// </summary>
+        /// <param name="innerHandler">
+        /// The inner handler which is responsible for processing the HTTP response messages.
+        /// </param>
+        public SwsErrorHandler(HttpMessageHandler innerHandler)
+            : base(innerHandler)
+        {
+        }
+
         /// <summary>
         /// Sends an HTTP request to the inner handler to send to the server as an asynchronous operation.
         /// </summary>
@@ -23,7 +42,9 @@
 
             if (!response.IsSuccessStatusCode)
             {
-                throw new SwsException("A request to SWS failed.", request, response);
+                throw new SwsException(
+                    string.Format("{0} ({1})", response.ReasonPhrase, (int)response.StatusCode),
+                    response);
             }
 
             return response;

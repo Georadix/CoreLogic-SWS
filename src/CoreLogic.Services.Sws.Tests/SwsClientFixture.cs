@@ -1,27 +1,48 @@
 ﻿namespace CoreLogic.Services.Sws
 {
     using Moq;
+    using System;
     using Xunit;
 
-    public class SwsClientFixture
+    public class SwsClientFixture : IDisposable
     {
-        private readonly Mock<ISwsConfig> config = new Mock<ISwsConfig>(MockBehavior.Strict);
+        private readonly SwsClient sut;
+        private bool disposed = false;
 
         public SwsClientFixture()
         {
-            this.config.Setup(c => c.Username).Returns("username");
-            this.config.Setup(c => c.Password).Returns("password");
-            this.config.Setup(c => c.NonSolicitationAreaWkt).Returns<string>(null);
-            this.config.Setup(c => c.EndpointUrl).Returns("http://sws.corelogic.com/api/v3.0.0/");
-            this.config.Setup(c => c.Timeout).Returns(10);
+            var config = new Mock<ISwsConfig>(MockBehavior.Strict);
+
+            config.Setup(c => c.Username).Returns("username");
+            config.Setup(c => c.Password).Returns("password");
+            config.Setup(c => c.NonSolicitationAreaWkt).Returns<string>(null);
+            config.Setup(c => c.EndpointUrl).Returns("http://sws.corelogic.com/api/v3.0.0/");
+            config.Setup(c => c.Timeout).Returns(10);
+
+            this.sut = new SwsClient(config.Object);
+        }
+
+        /// <summary>
+        /// Finalizes an instance of the <see cref="SwsClientFixture"/> class.
+        /// </summary>
+        ~SwsClientFixture()
+        {
+            this.Dispose(false);
+        }
+
+        /// <summary>
+        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+        /// </summary>
+        public void Dispose()
+        {
+            this.Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         [Fact(Skip = "External web service call, run manually.")]
         public void GeocodeReturnsExpectedResult()
         {
-            var sut = new SwsClient(this.config.Object);
-
-            var response = sut.Geocode("115 OLD FIELD LN, ST AUGUSTINE, FL 32092");
+            var response = this.sut.Geocode("115 OLD FIELD LN, ST AUGUSTINE, FL 32092");
 
             Assert.NotNull(response);
         }
@@ -29,9 +50,7 @@
         [Fact(Skip = "External web service call, run manually.")]
         public void GetAuthorizedFeaturesReturnsIt()
         {
-            var sut = new SwsClient(this.config.Object);
-
-            var response = sut.GetAuthorizedFeatures("authKey");
+            var response = this.sut.GetAuthorizedFeatures();
 
             Assert.NotNull(response);
         }
@@ -44,12 +63,11 @@
         public void GetSpatialRecordParcelCountExcludingNonSolicitationStatesFilterResults(
             string state, string polygonWkt, int unfilteredCount, int filteredCount)
         {
-            var sut = new SwsClient(this.config.Object);
-            var count = sut.GetSpatialRecordParcelCount(polygonWkt);
+            var count = this.sut.GetSpatialRecordParcelCount(polygonWkt);
 
             Assert.Equal(unfilteredCount, count);
 
-            var limitedCount = sut.GetSpatialRecordParcelCount(
+            var limitedCount = this.sut.GetSpatialRecordParcelCount(
                 polygonWkt: polygonWkt, excludeNonSolicitationStates: true);
 
             Assert.Equal(filteredCount, limitedCount);
@@ -58,10 +76,7 @@
         [Fact(Skip = "External web service call, run manually.")]
         public void GetSpatialRecordParcelCountWithPolygonReturnsCount()
         {
-            var sut = new SwsClient(this.config.Object);
-
-            var count = sut.GetSpatialRecordParcelCount(
-                "authKey",
+            var count = this.sut.GetSpatialRecordParcelCount(
                 "Polygon((-77.042999 38.89601,-77.039459 38.894239,-77.033536 38.896911,-77.041197 38.899467,-77.042999 38.89601))");
 
             Assert.Equal(30, count);
@@ -75,12 +90,11 @@
         public void GetSpatialRecordParcelsExcludingNonSolicitationStatesFilterResults(
             string state, string polygonWkt, int unfilteredCount, int filteredCount)
         {
-            var sut = new SwsClient(this.config.Object);
-            var parcels = sut.GetSpatialRecordParcels(polygonWkt);
+            var parcels = this.sut.GetSpatialRecordParcels(polygonWkt);
 
             Assert.Equal(unfilteredCount, parcels.Length);
 
-            var limitedParcels = sut.GetSpatialRecordParcels(
+            var limitedParcels = this.sut.GetSpatialRecordParcels(
                 polygonWkt: polygonWkt, excludeNonSolicitationStates: true);
 
             Assert.Equal(filteredCount, limitedParcels.Length);
@@ -89,9 +103,7 @@
         [Fact(Skip = "External web service call, run manually.")]
         public void GetSpatialRecordParcelsWithLatLongReturnsParcels()
         {
-            var sut = new SwsClient(this.config.Object);
-
-            var parcels = sut.GetSpatialRecordParcels(30.406001, -97.716578);
+            var parcels = this.sut.GetSpatialRecordParcels(30.406001, -97.716578);
 
             Assert.Equal(1, parcels.Length);
         }
@@ -99,12 +111,30 @@
         [Fact(Skip = "External web service call, run manually.")]
         public void GetSpatialRecordParcelsWithPolygonReturnsParcels()
         {
-            var sut = new SwsClient(this.config.Object);
-
-            var parcels = sut.GetSpatialRecordParcels(
+            var parcels = this.sut.GetSpatialRecordParcels(
                 "Polygon((-77.042999 38.89601,-77.039459 38.894239,-77.033536 38.896911,-77.041197 38.899467,-77.042999 38.89601))");
 
             Assert.Equal(30, parcels.Length);
+        }
+
+        /// <summary>
+        /// Releases unmanaged and - optionally - managed resources.
+        /// </summary>
+        /// <param name="disposing">
+        /// <c>true</c> to release both managed and unmanaged resources;
+        /// <c>false</c> to release only unmanaged resources.
+        /// </param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!this.disposed)
+            {
+                if (disposing)
+                {
+                    this.sut.Dispose();
+                }
+
+                this.disposed = true;
+            }
         }
     }
 }
