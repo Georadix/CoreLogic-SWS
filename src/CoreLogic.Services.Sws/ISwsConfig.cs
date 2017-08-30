@@ -1,7 +1,7 @@
 ﻿namespace CoreLogic.Services.Sws
 {
     /// <summary>
-    /// Defines the configuration for CoreLogic's Spatial Web Services (SWS).
+    /// Defines the configuration for CoreLogic Spatial Web Services (SWS).
     /// </summary>
     public interface ISwsConfig
     {

@@ -1,18 +1,22 @@
 ﻿namespace CoreLogic.Services.Sws
 {
+    using Newtonsoft.Json;
     using System;
+    using System.IO;
+    using System.Net;
     using System.Net.Http;
     using System.Runtime.Serialization;
     using System.Text;
 
     /// <summary>
-    /// Represents errors that occur while processing HTTP requests to CoreLogic's Spatial Web Services (SWS).
+    /// Represents errors that occur while processing HTTP requests to CoreLogic Spatial Web Services (SWS).
     /// </summary>
     [Serializable]
     public class SwsException : Exception
     {
-        private readonly HttpRequestMessage request;
+        private readonly object requestContent;
         private readonly HttpResponseMessage response;
+        private readonly object responseContent;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SwsException"/> class.
@@ -46,36 +50,23 @@
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="SwsException"/> class with a specified error message, request
-        /// message, and response message.
+        /// Initializes a new instance of the <see cref="SwsException"/> class with a specified error message, response
+        /// message, request content, and response content.
         /// </summary>
         /// <param name="message">The error message that explains the reason for the exception.</param>
-        /// <param name="request">The request message.</param>
         /// <param name="response">The response message.</param>
-        public SwsException(string message, HttpRequestMessage request, HttpResponseMessage response)
+        /// <param name="requestContent">The request content.</param>
+        /// <param name="responseContent">The response content.</param>
+        public SwsException(
+            string message,
+            HttpResponseMessage response,
+            object requestContent = null,
+            object responseContent = null)
             : this(message)
         {
-            this.request = request;
             this.response = response;
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="SwsException"/> class with a specified error message, request
-        /// message, response message, and a reference to the inner exception that is the cause of this exception.
-        /// </summary>
-        /// <param name="message">The error message that explains the reason for the exception.</param>
-        /// <param name="request">The request message.</param>
-        /// <param name="response">The response message.</param>
-        /// <param name="innerException">
-        /// The exception that is the cause of the current exception, or <see langword="null"/> if no inner exception
-        /// is specified.
-        /// </param>
-        public SwsException(
-            string message, HttpRequestMessage request, HttpResponseMessage response, Exception innerException)
-            : this(message, innerException)
-        {
-            this.request = request;
-            this.response = response;
+            this.requestContent = requestContent;
+            this.responseContent = responseContent;
         }
 
         /// <summary>
@@ -90,24 +81,33 @@
         protected SwsException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
-            this.request = (HttpRequestMessage)info.GetValue("Request", typeof(HttpRequestMessage));
             this.response = (HttpResponseMessage)info.GetValue("Response", typeof(HttpResponseMessage));
+            this.requestContent = info.GetValue("RequestContent", typeof(object));
+            this.responseContent = info.GetValue("ResponseContent", typeof(object));
         }
 
         /// <summary>
-        /// Gets the request message.
+        /// Gets the request content.
         /// </summary>
-        public HttpRequestMessage Request
+        public object RequestContent
         {
-            get { return this.request; }
+            get { return this.requestContent; }
         }
 
         /// <summary>
-        /// Gets the response message.
+        /// Gets the response content.
         /// </summary>
-        public HttpResponseMessage Response
+        public object ResponseContent
         {
-            get { return this.response; }
+            get { return this.responseContent; }
+        }
+
+        /// <summary>
+        /// Gets the status code of the HTTP response.
+        /// </summary>
+        public HttpStatusCode? StatusCode
+        {
+            get { return (this.response != null) ? this.response.StatusCode : (HttpStatusCode?)null; }
         }
 
         /// <summary>
@@ -124,8 +124,9 @@
         {
             base.GetObjectData(info, context);
 
-            info.AddValue("Request", this.request);
             info.AddValue("Response", this.response);
+            info.AddValue("RequestContent", this.requestContent);
+            info.AddValue("ResponseContent", this.responseContent);
         }
 
         /// <summary>
@@ -138,17 +139,51 @@
         {
             var builder = new StringBuilder(base.ToString());
 
-            if (this.request != null)
-            {
-                builder.AppendLine().AppendLine("Request:").Append(this.request);
-            }
+            this.AppendContent(
+                builder,
+                "Response:",
+                this.response,
+                this.responseContent,
+                (this.response != null) ? this.response.Content : null);
 
-            if (this.response != null)
-            {
-                builder.AppendLine().AppendLine("Response:").Append(this.response);
-            }
+            this.AppendContent(
+                builder,
+                "Request:",
+                (this.response != null) ? this.response.RequestMessage : null,
+                this.requestContent,
+                (this.response != null) ? this.response.RequestMessage.Content : null);
 
             return builder.ToString();
+        }
+
+        private void AppendContent(
+            StringBuilder builder, string title, object httpMessage, object objectContent, HttpContent httpContent)
+        {
+            builder.AppendLine().AppendLine(title).Append(httpMessage);
+
+            if (objectContent != null)
+            {
+                using (var writer = new StringWriter())
+                {
+                    var serializer = new JsonSerializer();
+                    serializer.Serialize(writer, objectContent);
+
+                    builder.AppendLine().AppendLine(writer.ToString());
+                }
+            }
+            else if (httpContent != null)
+            {
+                try
+                {
+                    var stringContent = httpContent.ReadAsStringAsync();
+                    stringContent.Wait();
+
+                    builder.AppendLine().AppendLine(stringContent.Result);
+                }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
         }
     }
 }
