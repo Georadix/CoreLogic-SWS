@@ -42,8 +42,11 @@
         /// Initializes a new instance of the <see cref="SwsClient"/> class.
         /// </summary>
         /// <param name="config">The configuration.</param>
+        /// <param name="handlers">
+        /// The list of HTTP handler that delegates the processing of HTTP response messages to another handler.
+        /// </param>
         /// <exception cref="ArgumentNullException"><paramref name="config" /> is <see langword="null" />.</exception>
-        public SwsClient(ISwsConfig config)
+        public SwsClient(ISwsConfig config, params DelegatingHandler[] handlers)
         {
             config.AssertNotNull("config");
 
@@ -55,7 +58,10 @@
                 ContractResolver = new CamelCasePropertyNamesContractResolver()
             };
 
-            this.httpClient = HttpClientFactory.Create(new SwsErrorHandler());
+            var allHandlers = new List<DelegatingHandler>(handlers);
+            allHandlers.Insert(0, new SwsErrorHandler());
+
+            this.httpClient = HttpClientFactory.Create(allHandlers.ToArray());
             this.httpClient.BaseAddress = new Uri(this.config.EndpointUrl);
             this.httpClient.Timeout = TimeSpan.FromSeconds(this.config.Timeout);
 
@@ -190,7 +196,7 @@
 
             if (excludeNonSolicitationStates && this.nonSolicitationArea.Intersects(polygon))
             {
-                return this.GetSpatialRecordParcels(polygonWkt, bundle, true).Length;
+                return this.GetSpatialRecordParcels(authKey, polygonWkt, bundle, true).Length;
             }
             else
             {
@@ -223,7 +229,7 @@
             bool excludeNonSolicitationStates = false)
         {
             return this.GetSpatialRecordParcels(
-                this.authKey,
+                authKey,
                 HttpMethod.Post,
                 (key, pageNumber) => new SpatialRecordPolygonRequest(key, polygonWkt, pageNumber, 50, bundle),
                 excludeNonSolicitationStates);
@@ -319,7 +325,7 @@
         {
             var request = this.httpClient.PostAsync(
                 "authenticate",
-                new AuthRequest { Password = this.config.Password, Username = this.config.Username },
+                new AuthRequest(this.config.Username, this.config.Password),
                 this.formatter);
             request.Wait();
 
