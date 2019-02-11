@@ -1,4 +1,4 @@
-﻿namespace CoreLogic.Services.Sws
+namespace CoreLogic.Services.Sws
 {
     using Georadix.Core;
     using Georadix.WebApi.Testing;
@@ -16,15 +16,17 @@
         private const string AuthKey = "TestingAuthKey";
         private readonly Mock<ISwsConfig> config = new Mock<ISwsConfig>(MockBehavior.Strict);
         private readonly FakeResponseHandler fakeResponseHandler;
-        private readonly SwsClient sut;
+        private SwsClient sut;
         private bool disposed = false;
 
         public SwsClientFixture()
         {
+            ServicePointManager.SecurityProtocol = ServicePointManager.SecurityProtocol | SecurityProtocolType.Tls12;
+
             this.config.Setup(c => c.Username).Returns("username");
             this.config.Setup(c => c.Password).Returns("password");
             this.config.Setup(c => c.NonSolicitationAreaWkt).Returns<string>(null);
-            this.config.Setup(c => c.EndpointUrl).Returns("http://sws.corelogic.com/api/v3.0.0/");
+            this.config.Setup(c => c.EndpointUrl).Returns("https://sws.beta.corelogic.com/api/v3.0.0/");
             this.config.Setup(c => c.Timeout).Returns(10);
 
             this.fakeResponseHandler = new FakeResponseHandler();
@@ -267,12 +269,14 @@
 
         [Theory(Skip = "External web service call, run manually.")]
         [InlineData("Idaho", "POLYGON((-112.04184651374817 43.49312138312793,-112.04257071018219 43.49218348707646,-112.03920185565948 43.49085639765385,-112.03851521015167 43.491767072127324,-112.04184651374817 43.49312138312793))", 41, 0)]
-        [InlineData("Kansas", "POLYGON((-94.6085661649704 39.105142361657066,-94.60488617420197 39.10517150078678,-94.60556209087372 39.10362711031401,-94.60846424102783 39.10392267013844,-94.6085661649704 39.105142361657066))", 33, 20)]
+        [InlineData("Kansas", "POLYGON((-94.6085661649704 39.105142361657066,-94.60488617420197 39.10517150078678,-94.60556209087372 39.10362711031401,-94.60846424102783 39.10392267013844,-94.6085661649704 39.105142361657066))", 24, 20)]
         [InlineData("Montana", "POLYGON((-108.54085296392441 45.77408241527412,-108.53938847780228 45.77408054446194,-108.53931605815887 45.7735791645344,-108.54086101055145 45.77360348530656,-108.54085296392441 45.77408241527412))", 8, 0)]
         [InlineData("Texas", "POLYGON((-96.82873249053955 32.8216640890017,-96.82787418365479 32.820996894866276,-96.82874858379364 32.8204423986301,-96.82948887348175 32.82102845145856,-96.82873249053955 32.8216640890017))", 13, 13)]
         public void GetSpatialRecordParcelCountExcludingNonSolicitationStatesFilterResults(
             string state, string polygonWkt, int unfilteredCount, int filteredCount)
         {
+            this.sut = new SwsClient(this.config.Object);
+
             var count = this.sut.GetSpatialRecordParcelCount(polygonWkt);
 
             Assert.Equal(unfilteredCount, count);
@@ -498,12 +502,14 @@
 
         [Theory(Skip = "External web service call, run manually.")]
         [InlineData("Idaho", "POLYGON((-112.04184651374817 43.49312138312793,-112.04257071018219 43.49218348707646,-112.03920185565948 43.49085639765385,-112.03851521015167 43.491767072127324,-112.04184651374817 43.49312138312793))", 41, 0)]
-        [InlineData("Kansas", "POLYGON((-94.6085661649704 39.105142361657066,-94.60488617420197 39.10517150078678,-94.60556209087372 39.10362711031401,-94.60846424102783 39.10392267013844,-94.6085661649704 39.105142361657066))", 33, 20)]
+        [InlineData("Kansas", "POLYGON((-94.6085661649704 39.105142361657066,-94.60488617420197 39.10517150078678,-94.60556209087372 39.10362711031401,-94.60846424102783 39.10392267013844,-94.6085661649704 39.105142361657066))", 24, 20)]
         [InlineData("Montana", "POLYGON((-108.54085296392441 45.77408241527412,-108.53938847780228 45.77408054446194,-108.53931605815887 45.7735791645344,-108.54086101055145 45.77360348530656,-108.54085296392441 45.77408241527412))", 8, 0)]
         [InlineData("Texas", "POLYGON((-96.82873249053955 32.8216640890017,-96.82787418365479 32.820996894866276,-96.82874858379364 32.8204423986301,-96.82948887348175 32.82102845145856,-96.82873249053955 32.8216640890017))", 13, 13)]
         public void GetSpatialRecordParcelsExcludingNonSolicitationStatesFilterResults(
             string state, string polygonWkt, int unfilteredCount, int filteredCount)
         {
+            this.sut = new SwsClient(this.config.Object);
+
             var parcels = this.sut.GetSpatialRecordParcels(polygonWkt);
 
             Assert.Equal(unfilteredCount, parcels.Length);
